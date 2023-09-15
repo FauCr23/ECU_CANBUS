@@ -1,0 +1,73 @@
+/* Creado por a01735674 Fausto Carrillo, programa para sistema de alarma de proximidad
+ *  correo A01735674@tec.mx
+ */
+#include <SPI.h>  //Librerias para comunicación con perifericos SPI
+#include <mcp2515.h> //Libreria para comunicacion con modulo MCP2515
+#define NOTE_A7  3520 //Nota musical para el zumbador
+
+
+const int ECHO=5;
+const int TRIG=4;
+int DURACION;
+int DISTANCIA;
+const int BUZZER = A4;
+const int CS_PIN= 10;
+
+int BOTON=1;
+
+struct can_frame canMsg;
+MCP2515 mcp(CS_PIN);
+
+void setup() { 
+  Serial.begin(115200);
+  mcp.reset();
+  mcp.setBitrate(CAN_125KBPS);
+  mcp.setNormalMode();
+  pinMode(BUZZER, OUTPUT);
+  pinMode(ECHO, INPUT);
+  pinMode(TRIG,OUTPUT);
+  pinMode(LED_BUILTIN, OUTPUT);
+}
+
+void loop() {
+  if (mcp.readMessage(&canMsg) == MCP2515::ERROR_OK) { 
+    Serial.print("Conexion establecida: ");
+    Serial.print(canMsg.can_id, HEX); // print ID
+    Serial.print(" "); 
+    Serial.print(canMsg.can_dlc, HEX); // print DLC
+    Serial.print(" ");
+    
+    for (int i = 0; i<canMsg.can_dlc; i++)  {  // print the data
+      Serial.print(canMsg.data[i],HEX);
+      Serial.print(" ");
+    }
+    if(canMsg.can_id==0xF6){
+      BOTON=canMsg.data[0];
+    
+      if(BOTON==0x8E){
+        digitalWrite(TRIG, HIGH); //Encendido del sensor ultrasonico
+        delay(1);
+        digitalWrite(TRIG,LOW);
+        DURACION= pulseIn(ECHO, HIGH);
+        DISTANCIA = DURACION/ 58.2;
+        Serial.print("DISTANCIA: ");
+        Serial.println(DISTANCIA);
+       
+        digitalWrite(LED_BUILTIN, HIGH);
+        tone(BUZZER, NOTE_A7, 8);
+        delay(DISTANCIA*7);
+        digitalWrite(LED_BUILTIN, LOW);
+        noTone(BUZZER);
+        delay(DISTANCIA*6);
+      }
+    }
+    
+      if(BOTON==0x00){
+        Serial.println("Sensor de proximidad apagado");
+        delay(300);
+        digitalWrite(TRIG,LOW);
+        noTone(BUZZER);
+        digitalWrite(LED_BUILTIN, LOW);
+    }
+  }
+}
